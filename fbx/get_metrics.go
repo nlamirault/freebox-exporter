@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/trazfr/freebox-exporter/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 // MetricsFreeboxSystem https://dev.freebox.fr/sdk/os/system/
@@ -351,7 +351,7 @@ func (f *FreeboxConnection) GetMetricsSwitch() (*MetricsFreeboxSwitch, error) {
 
 			// http://mafreebox.freebox.fr/api/v5/switch/port/1/stats
 			if err := f.get(fmt.Sprintf("switch/port/%d/stats/", port.ID), stats); err != nil {
-				log.Error.Println("Could not get status of port", port.ID, err)
+				level.Error(f.logger).Log("msg", fmt.Sprintf("Could not get status of port %s %s", port.ID, err))
 				return
 			}
 			port.Stats = stats
@@ -373,7 +373,7 @@ func (f *FreeboxConnection) GetMetricsWifi() (*MetricsFreeboxWifi, error) {
 		defer wg.Done()
 
 		if err := f.get("wifi/bss/", &res.Bss); err != nil {
-			log.Error.Println("Could not get the BSS", err)
+			level.Error(f.logger).Log("msg", fmt.Sprintf("Could not get the BSS %s", err))
 		}
 	}()
 
@@ -381,7 +381,7 @@ func (f *FreeboxConnection) GetMetricsWifi() (*MetricsFreeboxWifi, error) {
 		defer wg.Done()
 
 		if err := f.get("wifi/ap/", &res.Ap); err != nil {
-			log.Error.Println("Could not get the AP", err)
+			level.Error(f.logger).Log("msg", fmt.Sprintf("Could not get the AP %s", err))
 			return
 		}
 
@@ -393,7 +393,7 @@ func (f *FreeboxConnection) GetMetricsWifi() (*MetricsFreeboxWifi, error) {
 				defer wgAp.Done()
 
 				if err := f.get(fmt.Sprintf("wifi/ap/%d/stations/", ap.ID), &ap.Stations); err != nil {
-					log.Error.Println("Could not get stations of AP", ap.ID, err)
+					level.Error(f.logger).Log("msg", fmt.Sprintf("Could not get stations of AP %s", ap.ID, err))
 				}
 			}(ap)
 		}
@@ -450,7 +450,7 @@ func (f *FreeboxConnection) GetMetricsLan() (*MetricsFreeboxLan, error) {
 	for range interfaces {
 		result := <-details
 		if result.err != nil {
-			log.Error.Println("Could not get the hosts on interface", result.name, result.err)
+			level.Error(f.logger).Log("msg", fmt.Sprintf("Could not get the hosts on interface %s %s", result.name, result.err))
 		} else {
 			res.Hosts[result.name] = result.hosts
 		}
