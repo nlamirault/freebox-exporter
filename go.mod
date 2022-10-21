@@ -1,6 +1,6 @@
-module github.com/trazfr/freebox-exporter
+module github.com/nlamirault/freebox-exporter
 
-go 1.13
+go 1.19
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
