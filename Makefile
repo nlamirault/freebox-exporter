@@ -1,5 +1,5 @@
 APP = freebox-exporter
-BANNER = B B O X  E X P O R T E R
+BANNER = F R E E B O X    E X P O R T E R
 
 # Needs to be defined before including Makefile.common to auto-generate targets
 DOCKER_ARCHS ?= amd64 armv7 arm64
