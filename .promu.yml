@@ -6,7 +6,7 @@ repository:
     path: github.com/nlamirault/freebox-exporter
 build:
     binaries:
-      - name: freebox_exporter
+      - name: freebox-exporter
         path: .
     flags: -a -tags netgo
     ldflags: |
