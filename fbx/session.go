@@ -9,7 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/trazfr/freebox-exporter/log"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 )
 
 type sessionInfo struct {
@@ -29,9 +30,11 @@ type FreeboxSession struct {
 	sessionTokenLock       sync.Mutex
 	sessionInfo            *sessionInfo
 	oldSessionInfo         *sessionInfo // avoid deleting the sessionInfo too quickly
+
+	logger log.Logger
 }
 
-func GetAppToken(client *FreeboxHttpClient, apiVersion *FreeboxAPIVersion) (string, error) {
+func GetAppToken(client *FreeboxHttpClient, apiVersion *FreeboxAPIVersion, logger log.Logger) (string, error) {
 	reqStruct := getFreeboxAuthorize()
 	postResponse := struct {
 		AppToken string `json:"app_token"`
@@ -64,7 +67,7 @@ func GetAppToken(client *FreeboxHttpClient, apiVersion *FreeboxAPIVersion) (stri
 
 		switch status.Status {
 		case "pending":
-			log.Info.Println(counter, "Please accept the login on the Freebox Server")
+			level.Debug(logger).Log("msg", fmt.Sprintf("%s Please accept the login on the Freebox Server"))
 			time.Sleep(10 * time.Second)
 		case "granted":
 			return postResponse.AppToken, nil
@@ -74,7 +77,7 @@ func GetAppToken(client *FreeboxHttpClient, apiVersion *FreeboxAPIVersion) (stri
 	}
 }
 
-func NewFreeboxSession(appToken string, client *FreeboxHttpClient, apiVersion *FreeboxAPIVersion) (*FreeboxSession, error) {
+func NewFreeboxSession(appToken string, client *FreeboxHttpClient, apiVersion *FreeboxAPIVersion, logger log.Logger) (*FreeboxSession, error) {
 	getChallengeURL, err := apiVersion.GetURL("login/")
 	if err != nil {
 		return nil, err
@@ -89,8 +92,8 @@ func NewFreeboxSession(appToken string, client *FreeboxHttpClient, apiVersion *F
 		client:             client,
 		getSessionTokenURL: getSessionTokenURL,
 		getChallengeURL:    getChallengeURL,
-
-		appToken: appToken,
+		appToken:           appToken,
+		logger:             logger,
 	}
 	if err := result.Refresh(); err != nil {
 		return nil, err
@@ -113,7 +116,7 @@ func (f *FreeboxSession) Refresh() error {
 	defer f.sessionTokenLock.Unlock()
 
 	if sinceLastUpdate := time.Since(f.sessionTokenLastUpdate); sinceLastUpdate < 5*time.Second {
-		log.Debug.Printf("Updated %v ago. Skipping", sinceLastUpdate)
+		level.Debug(f.logger).Log("msg", fmt.Sprintf("Updated %v ago. Skipping", sinceLastUpdate))
 		return nil
 	}
 
@@ -135,7 +138,7 @@ func (f *FreeboxSession) Refresh() error {
 }
 
 func (f *FreeboxSession) getChallenge() (string, error) {
-	log.Debug.Println("GET challenge:", f.getChallengeURL)
+	level.Debug(f.logger).Log("msg", fmt.Sprintf("GET challenge: %s", f.getChallengeURL))
 	resStruct := struct {
 		Challenge string `json:"challenge"`
 	}{}
@@ -144,12 +147,12 @@ func (f *FreeboxSession) getChallenge() (string, error) {
 		return "", err
 	}
 
-	log.Debug.Println("Challenge:", resStruct.Challenge)
+	level.Debug(f.logger).Log("msg", fmt.Sprintf("Challenge: %s", resStruct.Challenge))
 	return resStruct.Challenge, nil
 }
 
 func (f *FreeboxSession) getSessionToken(challenge string) (string, error) {
-	log.Debug.Println("GET SessionToken:", f.getSessionTokenURL)
+	level.Debug(f.logger).Log("msg", fmt.Sprintf("GET SessionToken: %s", f.getSessionTokenURL))
 	freeboxAuthorize := getFreeboxAuthorize()
 
 	hash := hmac.New(sha1.New, []byte(f.appToken))
@@ -173,6 +176,6 @@ func (f *FreeboxSession) getSessionToken(challenge string) (string, error) {
 		return "", err
 	}
 
-	log.Debug.Println("SessionToken:", resStruct.SessionToken)
+	level.Debug(f.logger).Log("msg", fmt.Sprintf("SessionToken: %s", resStruct.SessionToken))
 	return resStruct.SessionToken, nil
 }

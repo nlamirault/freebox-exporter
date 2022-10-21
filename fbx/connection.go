@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/go-kit/log"
 )
 
 type config struct {
@@ -15,23 +17,24 @@ type FreeboxConnection struct {
 	client  *FreeboxHttpClient
 	session *FreeboxSession
 	config  config
+	logger  log.Logger
 }
 
 /*
  * FreeboxConnection
  */
 
-func NewFreeboxConnectionFromServiceDiscovery(discovery FreeboxDiscovery, forceApiVersion int) (*FreeboxConnection, error) {
-	client := NewFreeboxHttpClient()
-	apiVersion, err := NewFreeboxAPIVersion(client, discovery, forceApiVersion)
+func NewFreeboxConnectionFromServiceDiscovery(discovery FreeboxDiscovery, forceApiVersion int, logger log.Logger) (*FreeboxConnection, error) {
+	client := NewFreeboxHttpClient(logger)
+	apiVersion, err := NewFreeboxAPIVersion(client, discovery, forceApiVersion, logger)
 	if err != nil {
 		return nil, err
 	}
-	appToken, err := GetAppToken(client, apiVersion)
+	appToken, err := GetAppToken(client, apiVersion, logger)
 	if err != nil {
 		return nil, err
 	}
-	session, err := NewFreeboxSession(appToken, client, apiVersion)
+	session, err := NewFreeboxSession(appToken, client, apiVersion, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -43,11 +46,12 @@ func NewFreeboxConnectionFromServiceDiscovery(discovery FreeboxDiscovery, forceA
 			APIVersion: apiVersion,
 			AppToken:   appToken,
 		},
+		logger: logger,
 	}, nil
 }
 
-func NewFreeboxConnectionFromConfig(reader io.Reader, forceApiVersion int) (*FreeboxConnection, error) {
-	client := NewFreeboxHttpClient()
+func NewFreeboxConnectionFromConfig(reader io.Reader, forceApiVersion int, logger log.Logger) (*FreeboxConnection, error) {
+	client := NewFreeboxHttpClient(logger)
 	config := config{}
 	if err := json.NewDecoder(reader).Decode(&config); err != nil {
 		return nil, err
@@ -62,7 +66,7 @@ func NewFreeboxConnectionFromConfig(reader io.Reader, forceApiVersion int) (*Fre
 		return nil, fmt.Errorf("invalid app_token: %s", config.AppToken)
 	}
 
-	session, err := NewFreeboxSession(config.AppToken, client, config.APIVersion)
+	session, err := NewFreeboxSession(config.AppToken, client, config.APIVersion, logger)
 	if err != nil {
 		return nil, err
 	}

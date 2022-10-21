@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
-	"github.com/trazfr/freebox-exporter/log"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 )
 
 var (
@@ -21,6 +22,7 @@ var (
 type FreeboxHttpClient struct {
 	client http.Client
 	ctx    context.Context
+	logger log.Logger
 }
 
 type freeboxAPIResponse struct {
@@ -31,7 +33,7 @@ type freeboxAPIResponse struct {
 
 type FreeboxHttpClientCallback func(*http.Request)
 
-func NewFreeboxHttpClient() *FreeboxHttpClient {
+func NewFreeboxHttpClient(logger log.Logger) *FreeboxHttpClient {
 	result := &FreeboxHttpClient{
 		client: http.Client{
 			Transport: &http.Transport{
@@ -41,7 +43,8 @@ func NewFreeboxHttpClient() *FreeboxHttpClient {
 			},
 			Timeout: 10 * time.Second,
 		},
-		ctx: context.Background(),
+		ctx:    context.Background(),
+		logger: logger,
 	}
 
 	return result
@@ -77,7 +80,7 @@ func (f *FreeboxHttpClient) Post(url string, in interface{}, out interface{}, ca
 }
 
 func (f *FreeboxHttpClient) do(req *http.Request, out interface{}) error {
-	log.Debug.Println("HTTP request:", req.Method, req.URL.Path)
+	level.Debug(f.logger).Log("msg", fmt.Sprintf("HTTP request: %s %s", req.Method, req.URL.Path))
 
 	res, err := f.client.Do(req)
 	if err != nil {
@@ -87,12 +90,12 @@ func (f *FreeboxHttpClient) do(req *http.Request, out interface{}) error {
 	{
 		defer res.Body.Close()
 
-		body, err = ioutil.ReadAll(res.Body)
+		body, err = io.ReadAll(res.Body)
 		if err != nil {
 			return err
 		}
 	}
-	log.Debug.Println("HTTP Result:", string(body))
+	level.Debug(f.logger).Log("msg", fmt.Sprintf("HTTP Result: %s", string(body)))
 
 	apiResponse := freeboxAPIResponse{}
 	if err := json.Unmarshal(body, &apiResponse); err != nil {

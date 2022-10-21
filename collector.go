@@ -1,15 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/trazfr/freebox-exporter/fbx"
-	"github.com/trazfr/freebox-exporter/log"
 )
 
 const (
@@ -174,10 +177,11 @@ var (
 type Collector struct {
 	hostDetails bool
 	freebox     *fbx.FreeboxConnection
+	logger      log.Logger
 }
 
 func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
-	log.Debug.Println("Describe")
+	level.Debug(c.logger).Log("msg", "Prometheus Describe")
 	ch2 := make(chan prometheus.Metric)
 	go func() {
 		c.Collect(ch2)
@@ -189,7 +193,7 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-	log.Debug.Println("Collect")
+	level.Debug(c.logger).Log("msg", "Prometheus Collect")
 	wg := sync.WaitGroup{}
 	wg.Add(5)
 
@@ -201,7 +205,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	var boxFlavor string
 	go func() {
 		defer wg.Done()
-		log.Debug.Println("Collect system")
+		level.Debug(c.logger).Log("msg", "Collect system")
 
 		if m, err := c.freebox.GetMetricsSystem(); err == nil {
 			firmwareVersion = m.FirmwareVersion
@@ -227,7 +231,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			}
 		} else {
 			getMetricSuccessful = false
-			log.Error.Println(err)
+			level.Error(c.logger).Log("msg", err)
 		}
 	}()
 
@@ -238,7 +242,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	var cnxIPv6 string
 	go func() {
 		defer wg.Done()
-		log.Debug.Println("Collect connection")
+		level.Debug(c.logger).Log("msg", "Collect connection")
 
 		if m, err := c.freebox.GetMetricsConnection(); err == nil {
 			cnxType = m.Type
@@ -297,13 +301,13 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			}
 		} else {
 			getMetricSuccessful = false
-			log.Error.Println(err)
+			level.Error(c.logger).Log("msg", err)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		log.Debug.Println("Collect switch")
+		level.Debug(c.logger).Log("msg", "Collect switch")
 
 		if m, err := c.freebox.GetMetricsSwitch(); err == nil {
 			numPortsConnected := 0
@@ -343,13 +347,13 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(promDescSwitchPortConnectedTotal, prometheus.GaugeValue, float64(numPortsConnected))
 		} else {
 			getMetricSuccessful = false
-			log.Error.Println(err)
+			level.Error(c.logger).Log("msg", err)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		log.Debug.Println("Collect wifi")
+		level.Debug(c.logger).Log("msg", "Collect wifi")
 		if m, err := c.freebox.GetMetricsWifi(); err == nil {
 
 			for _, bss := range m.Bss {
@@ -443,14 +447,14 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			}
 		} else {
 			getMetricSuccessful = false
-			log.Error.Println(err)
+			level.Error(c.logger).Log("msg", err)
 		}
 
 	}()
 
 	go func() {
 		defer wg.Done()
-		log.Debug.Println("Collect lan")
+		level.Error(c.logger).Log("msg", "Collect LAN")
 
 		if m, err := c.freebox.GetMetricsLan(); err == nil {
 			for name, hosts := range m.Hosts {
@@ -502,7 +506,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			}
 		} else {
 			getMetricSuccessful = false
-			log.Error.Println(err)
+			level.Error(c.logger).Log("msg", err)
 		}
 	}()
 
@@ -625,29 +629,31 @@ func (c *Collector) toFloat(b bool) float64 {
 	return 0
 }
 
-func NewCollector(filename string, discovery fbx.FreeboxDiscovery, forceApiVersion int, hostDetails, debug bool) *Collector {
+func NewCollector(logger log.Logger, filename string, discovery fbx.FreeboxDiscovery, forceApiVersion int, hostDetails, debug bool) (*Collector, error) {
+	level.Info(logger).Log("msg", "Setup BBox exporter")
 	result := &Collector{
 		hostDetails: hostDetails,
+		logger:      logger,
 	}
 	newConfig := false
 	if r, err := os.Open(filename); err == nil {
-		log.Info.Println("Use configuration file", filename)
+		level.Info(logger).Log("msg", fmt.Sprintf("Use configuration file %s", filename))
 		defer r.Close()
-		result.freebox, err = fbx.NewFreeboxConnectionFromConfig(r, forceApiVersion)
+		result.freebox, err = fbx.NewFreeboxConnectionFromConfig(r, forceApiVersion, logger)
 		if err != nil {
 			panic(err)
 		}
 	} else {
-		log.Info.Println("Could not find the configuration file", filename)
+		level.Info(logger).Log("msg", fmt.Sprintf("Could not find the configuration file %s", filename))
 		newConfig = true
-		result.freebox, err = fbx.NewFreeboxConnectionFromServiceDiscovery(discovery, forceApiVersion)
+		result.freebox, err = fbx.NewFreeboxConnectionFromServiceDiscovery(discovery, forceApiVersion, logger)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	if newConfig {
-		log.Info.Println("Write the configuration file", filename)
+		level.Info(logger).Log("msg", fmt.Sprintf("Write the configuration file %s", filename))
 		w, err := os.Create(filename)
 		if err != nil {
 			panic(err)
@@ -657,7 +663,7 @@ func NewCollector(filename string, discovery fbx.FreeboxDiscovery, forceApiVersi
 			panic(err)
 		}
 	}
-	return result
+	return result, nil
 }
 
 func (c *Collector) Close() {

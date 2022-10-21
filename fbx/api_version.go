@@ -7,21 +7,23 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/hashicorp/mdns"
-	"github.com/trazfr/freebox-exporter/log"
 )
 
 type FreeboxAPIVersion struct {
-	APIDomain      string `json:"api_domain"`
-	UID            string `json:"uid"`
-	HTTPSAvailable bool   `json:"https_available"`
-	HTTPSPort      uint16 `json:"https_port"`
-	DeviceName     string `json:"device_name"`
-	APIVersion     string `json:"api_version"`
-	APIBaseURL     string `json:"api_base_url"`
-	DeviceType     string `json:"device_type"`
+	APIDomain       string `json:"api_domain"`
+	UID             string `json:"uid"`
+	HTTPSAvailable  bool   `json:"https_available"`
+	HTTPSPort       uint16 `json:"https_port"`
+	DeviceName      string `json:"device_name"`
+	APIVersion      string `json:"api_version"`
+	APIBaseURL      string `json:"api_base_url"`
+	DeviceType      string `json:"device_type"`
+	QueryApiVersion int    `json:"-"`
 
-	QueryApiVersion int `json:"-"`
+	logger log.Logger
 }
 
 const (
@@ -38,8 +40,10 @@ const (
 	FreeboxDiscoveryMDNS
 )
 
-func NewFreeboxAPIVersion(client *FreeboxHttpClient, discovery FreeboxDiscovery, forceApiVersion int) (*FreeboxAPIVersion, error) {
-	result := &FreeboxAPIVersion{}
+func NewFreeboxAPIVersion(client *FreeboxHttpClient, discovery FreeboxDiscovery, forceApiVersion int, logger log.Logger) (*FreeboxAPIVersion, error) {
+	result := &FreeboxAPIVersion{
+		logger: logger,
+	}
 
 	if err := result.getDiscovery(discovery)(client); err != nil {
 		return nil, err
@@ -52,7 +56,7 @@ func NewFreeboxAPIVersion(client *FreeboxHttpClient, discovery FreeboxDiscovery,
 	if !result.IsValid() {
 		return nil, errors.New("could not get the API version")
 	}
-	log.Debug.Println("APIVersion", result)
+	level.Debug(logger).Log("msg", fmt.Sprintf("APIVersion: %s", result))
 	return result, nil
 }
 
@@ -103,8 +107,7 @@ func (f *FreeboxAPIVersion) getDiscovery(discovery FreeboxDiscovery) func(client
 }
 
 func (f *FreeboxAPIVersion) newFreeboxAPIVersionHTTP(client *FreeboxHttpClient) error {
-	log.Info.Println("Freebox discovery: GET", apiVersionURL)
-
+	level.Info(f.logger).Log("msg", fmt.Sprintf("Freebox discovery: GET %s", apiVersionURL))
 	// HTTP GET api version
 	r, err := client.client.Get(apiVersionURL)
 	if err != nil {
@@ -119,16 +122,16 @@ func (f *FreeboxAPIVersion) newFreeboxAPIVersionHTTP(client *FreeboxHttpClient) 
 }
 
 func (f *FreeboxAPIVersion) newFreeboxAPIVersionMDNS(*FreeboxHttpClient) error {
-	log.Info.Println("Freebox discovery: mDNS")
+	level.Info(f.logger).Log("msg", "Freebox discovery: mDNS")
 	entries := make(chan *mdns.ServiceEntry, 4)
 
 	// mDNS lookup
 	go func() {
 		defer close(entries)
 		if err := mdns.Lookup(mdnsService, entries); err != nil {
-			log.Error.Println("mDNS lookup failed:", err)
+			level.Error(f.logger).Log("msg", fmt.Sprintf("mDNS lookup failed: %s", err))
 		}
-		log.Debug.Println("End of mDNS lookup")
+		level.Debug(f.logger).Log("msg", "End of mDNS lookup")
 	}()
 
 	for entry := range entries {

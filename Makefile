@@ -27,7 +27,7 @@ GO = go
 GOX = gox -osarch="linux/amd64" -osarch="linux/arm64" -osarch="linux/arm" -osarch="darwin/amd64" -osarch="windows/amd64"
 GOX_ARGS = "-output={{.Dir}}-$(VERSION)_{{.OS}}_{{.Arch}}"
 
-MAIN = github.com/nlamirault/freebox-exporter
+MAIN = github.com/trazfr/freebox-exporter
 
 PACKAGE=$(APP)-$(VERSION)
 ARCHIVE=$(PACKAGE).tar
