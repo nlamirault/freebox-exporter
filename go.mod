@@ -3,7 +3,7 @@ module github.com/trazfr/freebox-exporter
 go 1.19
 
 require (
-	github.com/go-kit/kit v0.9.0
+	github.com/go-kit/kit v0.12.0
 	github.com/go-kit/log v0.2.1
 	github.com/hashicorp/mdns v1.0.5
 	github.com/prometheus/client_golang v1.13.0
@@ -22,7 +22,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
-	github.com/miekg/dns v1.1.41 // indirect
+	github.com/miekg/dns v1.1.43 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
