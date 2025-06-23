@@ -7,7 +7,7 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/hashicorp/mdns v1.0.5
 	github.com/prometheus/client_golang v1.14.0
-	github.com/prometheus/common v0.37.0
+	github.com/prometheus/common v0.65.0
 	github.com/prometheus/exporter-toolkit v0.8.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
